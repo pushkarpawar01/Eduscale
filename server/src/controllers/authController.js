@@ -48,16 +48,22 @@ export const register = async (req, res) => {
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    const trimmedEmail = email.trim();
+    const user = await User.findOne({ email: trimmedEmail });
+    
+    if (!user) {
+      console.log('Login failed: User not found for email:', trimmedEmail);
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
+    
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const { accessToken, refreshToken } = generateTokens(user);
     setTokenCookie(res, refreshToken);
 
-    res.json({ token: accessToken, user: { id: user._id, name: user.name, email: user.email } });
+    res.json({ token: accessToken, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -87,4 +93,30 @@ export const logout = (req, res) => {
     sameSite: 'strict',
   });
   res.json({ message: 'Logged out successfully' });
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const updates = req.body;
+    
+    // Safety: prevent password and email changes through this endpoint
+    delete updates.password;
+    delete updates.email;
+
+    const user = await User.findByIdAndUpdate(userId, updates, { new: true }).select('-password');
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
 };

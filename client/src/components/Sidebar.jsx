@@ -39,36 +39,48 @@ const Sidebar = ({ isOpen, onClose }) => {
 
         <nav className="py-6 flex-1 overflow-y-auto no-scrollbar">
           <ul className="px-2 space-y-1">
-            <li>
-              <NavLink to="/recommended" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <Star size={20} /> Recommended Courses
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/dashboard" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <BookOpen size={20} /> All Courses
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/enrolled" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <Book size={20} /> My Enrolled Courses
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/certificates" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <Award size={20} /> My Certificates
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/refer" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <Rocket size={20} /> Refer & Earn
-              </NavLink>
-            </li>
-            <li>
-              <NavLink to="/profile" className={navLinkClass} onClick={() => onClose && onClose()}>
-                <User size={20} /> Update Profile
-              </NavLink>
-            </li>
+            {user?.role === 'admin' ? (
+              <>
+                <li>
+                  <NavLink to="/admin" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <BookOpen size={20} /> Manage Courses
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/profile" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <User size={20} /> Admin Profile
+                  </NavLink>
+                </li>
+              </>
+            ) : (
+              <>
+                <li>
+                  <NavLink to="/dashboard" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <BookOpen size={20} /> All Courses
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/enrolled" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <Book size={20} /> My Enrolled Courses
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/certificates" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <Award size={20} /> My Certificates
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/refer" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <Rocket size={20} /> Refer & Earn
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/profile" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <User size={20} /> Update Profile
+                  </NavLink>
+                </li>
+              </>
+            )}
           </ul>
         </nav>
 
@@ -79,7 +91,7 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
             <div className="flex flex-col overflow-hidden">
               <p className="font-semibold text-sm truncate">{user?.name || 'User'}</p>
-              <span className="text-xs text-dark-400">Student Account</span>
+              <span className="text-xs text-dark-400 capitalize">{user?.role || 'Student'} Account</span>
             </div>
           </div>
           <button

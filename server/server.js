@@ -10,6 +10,8 @@ import logger from './src/middleware/logger.js';
 import authRoutes from './src/routes/auth.js';
 import sessionRoutes from './src/routes/session.js';
 import contentRoutes from './src/routes/content.js';
+import courseRoutes from './src/routes/course.js';
+import enrollmentRoutes from './src/routes/enrollment.js';
 
 // Load env vars
 dotenv.config();
@@ -34,6 +36,8 @@ app.use('/api', logger);
 app.use('/api/auth', authRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/content', contentRoutes);
+app.use('/api/course', courseRoutes);
+app.use('/api/enrollment', enrollmentRoutes);
 
 // --- PRODUCTION CONFIGURATION ---
 if (process.env.NODE_ENV === 'production') {

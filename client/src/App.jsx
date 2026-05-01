@@ -5,12 +5,28 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import MyEnrolledCourses from './pages/MyEnrolledCourses';
+import CourseView from './pages/CourseView';
+import Profile from './pages/Profile';
+import MyCertificates from './pages/MyCertificates';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './pages/AdminLogin';
 
-const ProtectedRoute = ({ children }) => {
+const StudentRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
+  if (user.role === 'admin') return <Navigate to="/admin" />;
+  
+  return children;
+};
+
+const AdminProtectedRoute = ({ children }) => {
+  const { user, loading } = useContext(AuthContext);
+  
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!user || user.role !== 'admin') return <Navigate to="/admin-login" />;
   
   return children;
 };
@@ -18,9 +34,18 @@ const ProtectedRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
   
-  if (loading) return <div>Loading...</div>;
-  if (user) return <Navigate to="/dashboard" />;
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (user) {
+    return user.role === 'admin' ? <Navigate to="/admin" /> : <Navigate to="/dashboard" />;
+  }
   
+  return children;
+};
+
+const ProtectedRoute = ({ children }) => {
+  const { user, loading } = useContext(AuthContext);
+  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  if (!user) return <Navigate to="/login" />;
   return children;
 };
 
@@ -35,9 +60,50 @@ function App() {
           <Route 
             path="/dashboard" 
             element={
-              <ProtectedRoute>
+              <StudentRoute>
                 <Dashboard />
+              </StudentRoute>
+            } 
+          />
+          <Route 
+            path="/enrolled" 
+            element={
+              <StudentRoute>
+                <MyEnrolledCourses />
+              </StudentRoute>
+            } 
+          />
+          <Route 
+            path="/learn/:courseId" 
+            element={
+              <StudentRoute>
+                <CourseView />
+              </StudentRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/certificates" 
+            element={
+              <StudentRoute>
+                <MyCertificates />
+              </StudentRoute>
+            } 
+          />
+          <Route path="/admin-login" element={<PublicRoute><AdminLogin /></PublicRoute>} />
+          <Route 
+            path="/admin" 
+            element={
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
             } 
           />
           <Route path="*" element={<Navigate to="/" />} />

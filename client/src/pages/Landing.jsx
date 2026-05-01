@@ -125,8 +125,11 @@ const Landing = () => {
           Empowering students through scalable education. High-performance learning for the next generation.
         </p>
         <div className="w-full max-w-2xl mx-auto h-px bg-dark-800 mb-8" />
-        <div className="text-sm font-medium">
-          &copy; {new Date().getFullYear()} Eduscale Learning Platform. All rights reserved.
+        <div className="text-sm font-medium flex flex-col items-center gap-4">
+          <p>&copy; {new Date().getFullYear()} Eduscale Learning Platform. All rights reserved.</p>
+          <Link to="/admin-login" className="text-dark-600 hover:text-dark-400 transition-colors text-xs">
+            Admin Portal
+          </Link>
         </div>
       </footer>
     </div>

@@ -7,23 +7,28 @@ import { AuthContext } from '../context/AuthContext';
 
 const Dashboard = () => {
   const [courses, setCourses] = useState([]);
+  const [enrolledIds, setEnrolledIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    const fetchCourses = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get('/api/content/list');
-        setCourses(res.data);
+        const [coursesRes, enrollmentRes] = await Promise.all([
+          api.get('/api/content/list'),
+          api.get('/api/enrollment/my-courses')
+        ]);
+        setCourses(coursesRes.data);
+        setEnrolledIds(enrollmentRes.data.map(e => e.course._id));
       } catch (error) {
-        console.error('Failed to fetch courses', error);
+        console.error('Failed to fetch data', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchCourses();
+    fetchData();
   }, []);
 
   return (
@@ -47,8 +52,8 @@ const Dashboard = () => {
       <main className="flex-1 p-4 sm:p-8 flex flex-col min-w-0">
         <div className="flex justify-between items-center mb-8">
           <h1 className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-dark-900">
-            <BookOpen size={28} className="text-accent" />
-            All Courses
+            <BookOpen size={28} className="text-primary" />
+            Explore All Courses
           </h1>
         </div>
 
@@ -56,13 +61,17 @@ const Dashboard = () => {
           <div className="flex items-center justify-center h-64 text-dark-500">
             <div className="animate-pulse flex flex-col items-center gap-4">
               <div className="w-12 h-12 bg-dark-200 rounded-full"></div>
-              <p>Loading courses...</p>
+              <p>Loading your catalog...</p>
             </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 sm:gap-8">
             {courses.map(course => (
-              <CourseCard key={course._id} course={course} />
+              <CourseCard 
+                key={course._id} 
+                course={course} 
+                isEnrolled={enrolledIds.includes(course._id)}
+              />
             ))}
           </div>
         )}
