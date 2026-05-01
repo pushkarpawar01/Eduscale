@@ -11,6 +11,7 @@ import Profile from './pages/Profile';
 import MyCertificates from './pages/MyCertificates';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminLogin from './pages/AdminLogin';
+import AdminAnalytics from './pages/AdminAnalytics';
 
 const StudentRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -103,6 +104,14 @@ function App() {
             element={
               <AdminProtectedRoute>
                 <AdminDashboard />
+              </AdminProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics" 
+            element={
+              <AdminProtectedRoute>
+                <AdminAnalytics />
               </AdminProtectedRoute>
             } 
           />

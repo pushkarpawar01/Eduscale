@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Rocket, BookOpen, Star, Book, Award, User, LogOut, X } from 'lucide-react';
+import { Rocket, BookOpen, Star, Book, Award, User, LogOut, X, Activity } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -48,6 +48,11 @@ const Sidebar = ({ isOpen, onClose }) => {
                 <li>
                   <NavLink to="/admin" className={navLinkClass} onClick={() => onClose && onClose()}>
                     <BookOpen size={20} /> Manage Courses
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink to="/analytics" className={navLinkClass} onClick={() => onClose && onClose()}>
+                    <Activity size={20} /> System Analytics
                   </NavLink>
                 </li>
                 <li>

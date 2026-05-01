@@ -13,6 +13,7 @@ import contentRoutes from './src/routes/content.js';
 import courseRoutes from './src/routes/course.js';
 import enrollmentRoutes from './src/routes/enrollment.js';
 import paymentRoutes from './src/routes/payment.js';
+import analyticsRoutes from './src/routes/analytics.js';
 
 // Load env vars
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/content', contentRoutes);
 app.use('/api/course', courseRoutes);
 app.use('/api/enrollment', enrollmentRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // --- PRODUCTION CONFIGURATION ---
 if (process.env.NODE_ENV === 'production') {
