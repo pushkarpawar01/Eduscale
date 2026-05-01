@@ -13,6 +13,14 @@ const CourseCard = ({ course, isEnrolled }) => {
       return;
     }
 
+    if (course.isFree) {
+      handleFreeEnroll();
+    } else {
+      handleRazorpayPayment();
+    }
+  };
+
+  const handleFreeEnroll = async () => {
     setLoading(true);
     try {
       await api.post('/api/enrollment/enroll', { courseId: course._id });
@@ -20,6 +28,59 @@ const CourseCard = ({ course, isEnrolled }) => {
       navigate(`/learn/${course._id}`);
     } catch (error) {
       alert(error.response?.data?.message || 'Failed to enroll');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRazorpayPayment = async () => {
+    setLoading(true);
+    try {
+      // 1. Create Order
+      const orderRes = await api.post('/api/payment/order', { courseId: course._id });
+      const { order, key_id } = orderRes.data;
+
+      // 2. Open Razorpay
+      const options = {
+        key: key_id,
+        amount: order.amount,
+        currency: order.currency,
+        name: "Eduscale",
+        description: `Course: ${course.title.substring(0, 30)}`,
+        image: course.imageUrl || "https://eduscale.com/logo.png", // Ensure absolute URL
+        order_id: order.id,
+        modal: {
+          ondismiss: function() {
+            setLoading(false);
+          }
+        },
+        handler: async (response) => {
+          try {
+            // 3. Verify Payment
+            const verifyRes = await api.post('/api/payment/verify', {
+              ...response,
+              courseId: course._id
+            });
+            alert("Payment successful! Welcome to the course.");
+            navigate(`/learn/${course._id}`);
+          } catch (error) {
+            alert("Payment verification failed. Please contact support.");
+          }
+        },
+        prefill: {
+          name: "", // Will be filled by Razorpay or can be passed from auth context
+          email: "",
+          contact: ""
+        },
+        theme: {
+          color: "#f97316"
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (error) {
+      alert("Failed to initiate payment. Please try again.");
     } finally {
       setLoading(false);
     }
