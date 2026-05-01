@@ -30,6 +30,13 @@ const enrollmentSchema = new mongoose.Schema({
   completedModules: [{
     type: String // IDs or Titles of completed modules
   }],
+  quizResults: [{
+    moduleId: String,
+    score: Number,
+    totalQuestions: Number,
+    passed: Boolean,
+    submittedAt: { type: Date, default: Date.now }
+  }],
   completed: {
     type: Boolean,
     default: false

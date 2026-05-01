@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/axiosInstance';
 import Sidebar from '../components/Sidebar';
-import { Plus, Edit, Trash2, Video, FileText, CheckCircle, AlertCircle, Save, X, Search, MoreVertical } from 'lucide-react';
+import { 
+  Plus, Edit, Trash2, Video, FileText, CheckCircle, AlertCircle, Save, X, Search, 
+  MoreVertical, Users, BookOpen, Layout, ChevronDown, ChevronUp, PlusCircle, MinusCircle 
+} from 'lucide-react';
 
 const AdminDashboard = () => {
+  const [activeTab, setActiveTab] = useState('courses'); // 'courses' or 'enrollments'
   const [courses, setCourses] = useState([]);
+  const [enrollments, setEnrollments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
@@ -13,21 +18,30 @@ const AdminDashboard = () => {
   const [courseData, setCourseData] = useState({
     title: '', description: '', imageUrl: '', price: 0, isFree: false, category: ''
   });
-  const [modules, setModules] = useState([{ title: '', videoUrl: '', pdfUrl: '', duration: '' }]);
+  const [modules, setModules] = useState([{ 
+    title: '', description: '', videoUrl: '', pdfUrl: '', duration: '', 
+    quiz: [] 
+  }]);
+  
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState({ type: '', msg: '' });
 
   useEffect(() => {
-    fetchCourses();
+    fetchData();
   }, []);
 
-  const fetchCourses = async () => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const res = await api.get('/api/course'); // Assuming this returns all courses
-      setCourses(res.data);
+      const [coursesRes, enrollRes] = await Promise.all([
+        api.get('/api/course'),
+        api.get('/api/enrollment/all')
+      ]);
+      setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : []);
+      setEnrollments(Array.isArray(enrollRes.data) ? enrollRes.data : []);
     } catch (error) {
-      console.error('Failed to fetch courses', error);
+      console.error('Failed to fetch data', error);
     } finally {
       setLoading(false);
     }
@@ -36,7 +50,7 @@ const AdminDashboard = () => {
   const handleOpenCreate = () => {
     setEditingCourse(null);
     setCourseData({ title: '', description: '', imageUrl: '', price: 0, isFree: false, category: '' });
-    setModules([{ title: '', videoUrl: '', pdfUrl: '', duration: '' }]);
+    setModules([{ title: '', description: '', videoUrl: '', pdfUrl: '', duration: '', quiz: [] }]);
     setIsModalOpen(true);
   };
 
@@ -50,7 +64,12 @@ const AdminDashboard = () => {
       isFree: course.isFree,
       category: course.category
     });
-    setModules(course.modules && course.modules.length > 0 ? course.modules : [{ title: '', videoUrl: '', pdfUrl: '', duration: '' }]);
+    // Ensure all existing modules have a quiz array
+    const existingModules = course.modules.map(m => ({
+      ...m,
+      quiz: m.quiz || []
+    }));
+    setModules(existingModules.length > 0 ? existingModules : [{ title: '', description: '', videoUrl: '', pdfUrl: '', duration: '', quiz: [] }]);
     setIsModalOpen(true);
   };
 
@@ -77,11 +96,37 @@ const AdminDashboard = () => {
   };
 
   const addModuleField = () => {
-    setModules([...modules, { title: '', videoUrl: '', pdfUrl: '', duration: '' }]);
+    setModules([...modules, { title: '', description: '', videoUrl: '', pdfUrl: '', duration: '', quiz: [] }]);
   };
 
   const removeModuleField = (index) => {
     setModules(modules.filter((_, i) => i !== index));
+  };
+
+  const addQuizQuestion = (moduleIndex) => {
+    const newModules = [...modules];
+    newModules[moduleIndex].quiz.push({
+      question: '',
+      options: ['', '', '', ''],
+      correctAnswer: 0
+    });
+    setModules(newModules);
+  };
+
+  const removeQuizQuestion = (moduleIndex, questionIndex) => {
+    const newModules = [...modules];
+    newModules[moduleIndex].quiz = newModules[moduleIndex].quiz.filter((_, i) => i !== questionIndex);
+    setModules(newModules);
+  };
+
+  const handleQuizChange = (moduleIndex, questionIndex, field, value, optionIndex = null) => {
+    const newModules = [...modules];
+    if (optionIndex !== null) {
+      newModules[moduleIndex].quiz[questionIndex].options[optionIndex] = value;
+    } else {
+      newModules[moduleIndex].quiz[questionIndex][field] = value;
+    }
+    setModules(newModules);
   };
 
   const handleFileUpload = async (index, field, file) => {
@@ -96,7 +141,7 @@ const AdminDashboard = () => {
       });
       handleModuleChange(index, field, res.data.url);
     } catch (error) {
-      alert('File upload failed. Check server/S3 config.');
+      alert('File upload failed.');
     } finally {
       setUploading(false);
     }
@@ -107,7 +152,6 @@ const AdminDashboard = () => {
     setSaving(true);
     try {
       const payload = { ...courseData, modules };
-      
       if (editingCourse) {
         await api.put(`/api/course/${editingCourse._id}`, payload);
         setStatus({ type: 'success', msg: 'Course updated successfully!' });
@@ -115,9 +159,8 @@ const AdminDashboard = () => {
         await api.post('/api/course/create', payload);
         setStatus({ type: 'success', msg: 'Course created successfully!' });
       }
-      
       setIsModalOpen(false);
-      fetchCourses();
+      fetchData();
     } catch (error) {
       setStatus({ type: 'error', msg: 'Failed to save course.' });
     } finally {
@@ -129,17 +172,36 @@ const AdminDashboard = () => {
     <div className="flex flex-col lg:flex-row min-h-screen bg-dark-50">
       <Sidebar />
       <main className="flex-1 p-4 sm:p-8 flex flex-col min-w-0 h-screen overflow-y-auto">
-        <header className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-dark-900">Course Management</h1>
-            <p className="text-dark-500 mt-1">Create, edit and manage your educational content</p>
+        <header className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-dark-900">Admin Control Center</h1>
+              <p className="text-dark-500 mt-1">Manage content and monitor student excellence</p>
+            </div>
+            <div className="flex bg-white p-1 rounded-xl shadow-sm border border-dark-200">
+              <button 
+                onClick={() => setActiveTab('courses')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'courses' ? 'bg-primary text-white shadow-md' : 'text-dark-500 hover:bg-dark-50'}`}
+              >
+                Courses
+              </button>
+              <button 
+                onClick={() => setActiveTab('enrollments')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'enrollments' ? 'bg-primary text-white shadow-md' : 'text-dark-500 hover:bg-dark-50'}`}
+              >
+                Student Progress
+              </button>
+            </div>
           </div>
-          <button 
-            onClick={handleOpenCreate}
-            className="px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-          >
-            <Plus size={20} /> Create New Course
-          </button>
+          
+          {activeTab === 'courses' && (
+            <button 
+              onClick={handleOpenCreate}
+              className="w-full sm:w-auto px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+            >
+              <Plus size={20} /> Create New Course
+            </button>
+          )}
         </header>
 
         {status.msg && (
@@ -154,229 +216,235 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* Course List Table */}
-        <div className="bg-white rounded-2xl border border-dark-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-dark-50 border-b border-dark-200">
-                  <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Course</th>
-                  <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Price</th>
-                  <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Modules</th>
-                  <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-dark-100">
-                {courses.length > 0 ? courses.map((course) => (
-                  <tr key={course._id} className="hover:bg-dark-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
-                        <img src={course.imageUrl} alt="" className="w-12 h-12 rounded-lg object-cover bg-dark-100 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="font-bold text-dark-900 truncate">{course.title}</p>
-                          <p className="text-xs text-dark-500 truncate max-w-[200px]">{course.description}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full">
-                        {course.category || 'General'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="font-bold text-dark-900">
-                        {course.isFree ? 'Free' : `₹${course.price}`}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-dark-500">
-                        <Video size={16} />
-                        <span className="text-sm font-medium">{course.modules?.length || 0}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button 
-                          onClick={() => handleOpenEdit(course)}
-                          className="p-2 text-dark-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                          title="Edit Course"
-                        >
-                          <Edit size={18} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(course._id)}
-                          className="p-2 text-dark-400 hover:text-danger hover:bg-danger/10 rounded-lg transition-all"
-                          title="Delete Course"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-dark-400">
-                      {loading ? 'Loading courses...' : 'No courses found. Create your first one!'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
           </div>
-        </div>
+        ) : (
+          <>
+            {activeTab === 'courses' ? (
+              <div className="bg-white rounded-2xl border border-dark-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-dark-50 border-b border-dark-200">
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Course Info</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Price</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Curriculum</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-100">
+                      {courses.map((course) => (
+                        <tr key={course._id} className="hover:bg-dark-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-4">
+                              <img src={course.imageUrl} alt="" className="w-14 h-14 rounded-xl object-cover border border-dark-100" />
+                              <div className="min-w-0">
+                                <p className="font-bold text-dark-900 truncate">{course.title}</p>
+                                <p className="text-xs text-primary font-bold uppercase">{course.category || 'General'}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-dark-900">
+                              {course.isFree ? <span className="text-success">Free</span> : `₹${course.price}`}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-sm font-medium text-dark-700 flex items-center gap-1">
+                                <BookOpen size={14} /> {course.modules?.length || 0} Modules
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => handleOpenEdit(course)} className="p-2 text-dark-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Edit size={18} /></button>
+                              <button onClick={() => handleDelete(course._id)} className="p-2 text-dark-400 hover:text-danger hover:bg-danger/10 rounded-lg transition-all"><Trash2 size={18} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-dark-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-dark-50 border-b border-dark-200">
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Student</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Course</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Progress</th>
+                        <th className="px-6 py-4 text-xs font-bold text-dark-500 uppercase tracking-wider">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-100">
+                      {enrollments.map((enr) => (
+                        <tr key={enr._id}>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col">
+                              <p className="font-bold text-dark-900">{enr.user?.name}</p>
+                              <p className="text-xs text-dark-500">{enr.user?.email}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <p className="font-medium text-dark-700">{enr.course?.title}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="w-24 h-2 bg-dark-100 rounded-full overflow-hidden">
+                                <div className="bg-primary h-full" style={{ width: `${enr.progress}%` }} />
+                              </div>
+                              <span className="text-xs font-bold text-dark-600">{enr.progress}%</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${enr.completed ? 'bg-success/10 text-success' : 'bg-accent/10 text-accent'}`}>
+                              {enr.completed ? 'Completed' : 'In Progress'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
-        {/* Create/Edit Modal */}
+        {/* Modal Builder */}
         {isModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
             <div className="absolute inset-0 bg-dark-900/60 backdrop-blur-sm" onClick={() => !saving && setIsModalOpen(false)} />
-            <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white w-full max-w-5xl max-h-[90vh] rounded-3xl shadow-2xl z-10 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
               <header className="p-6 border-b border-dark-200 flex items-center justify-between bg-dark-50">
-                <h2 className="text-xl font-bold text-dark-900">
-                  {editingCourse ? 'Edit Course' : 'Create New Course'}
-                </h2>
-                <button 
-                  onClick={() => setIsModalOpen(false)} 
-                  disabled={saving}
-                  className="p-2 hover:bg-dark-200 rounded-full transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                <h2 className="text-xl font-bold text-dark-900">{editingCourse ? 'Update Curriculum' : 'New Course Design'}</h2>
+                <button onClick={() => setIsModalOpen(false)} disabled={saving} className="p-2 hover:bg-dark-200 rounded-full"><X size={20} /></button>
               </header>
 
-              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8">
-                {/* Course Details */}
-                <div className="space-y-6">
-                  <h3 className="text-sm font-bold text-dark-400 uppercase tracking-wider">Basic Information</h3>
+              <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-10">
+                <section className="space-y-6">
+                  <h3 className="text-sm font-bold text-dark-400 uppercase tracking-widest border-b border-dark-100 pb-2">1. Course Essentials</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="md:col-span-2">
-                      <label htmlFor="title" className="block text-sm font-bold text-dark-700 mb-2">Course Title</label>
-                      <input 
-                        id="title" type="text" required value={courseData.title} onChange={handleCourseChange}
-                        className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                      />
+                      <label className="block text-sm font-bold text-dark-700 mb-2">Title</label>
+                      <input id="title" type="text" required value={courseData.title} onChange={handleCourseChange} className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" />
                     </div>
                     <div className="md:col-span-2">
-                      <label htmlFor="description" className="block text-sm font-bold text-dark-700 mb-2">Description</label>
-                      <textarea 
-                        id="description" required rows="3" value={courseData.description} onChange={handleCourseChange}
-                        className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                      />
+                      <label className="block text-sm font-bold text-dark-700 mb-2">General Description</label>
+                      <textarea id="description" required rows="3" value={courseData.description} onChange={handleCourseChange} className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" />
                     </div>
-                    <div>
-                      <label htmlFor="imageUrl" className="block text-sm font-bold text-dark-700 mb-2">Thumbnail URL</label>
-                      <input 
-                        id="imageUrl" type="text" required value={courseData.imageUrl} onChange={handleCourseChange}
-                        className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="category" className="block text-sm font-bold text-dark-700 mb-2">Category</label>
-                      <input 
-                        id="category" type="text" value={courseData.category} onChange={handleCourseChange}
-                        className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                      />
-                    </div>
-                    <div className="flex items-center gap-8 p-4 bg-dark-50 rounded-xl border border-dark-200 md:col-span-2">
-                      <div className="flex items-center gap-2">
-                        <input 
-                          id="isFree" type="checkbox" checked={courseData.isFree} onChange={handleCourseChange}
-                          className="w-5 h-5 rounded border-dark-300 text-primary focus:ring-primary"
-                        />
-                        <label htmlFor="isFree" className="text-sm font-bold text-dark-900">Free Course</label>
-                      </div>
+                    <div className="flex items-center gap-4 p-4 bg-dark-50 rounded-xl border border-dark-200 md:col-span-2">
+                      <input id="isFree" type="checkbox" checked={courseData.isFree} onChange={handleCourseChange} className="w-5 h-5 rounded border-dark-300 text-primary" />
+                      <label htmlFor="isFree" className="text-sm font-bold text-dark-900">This is a free course</label>
                       {!courseData.isFree && (
-                        <div className="flex-1 max-w-[200px]">
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400 font-bold">₹</span>
-                            <input 
-                              id="price" type="number" value={courseData.price} onChange={handleCourseChange}
-                              className="w-full pl-8 pr-4 py-2 bg-white border border-dark-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
-                            />
-                          </div>
+                        <div className="ml-auto flex items-center gap-2">
+                          <span className="font-bold">Price: ₹</span>
+                          <input id="price" type="number" value={courseData.price} onChange={handleCourseChange} className="w-24 px-3 py-1 border rounded-lg" />
                         </div>
                       )}
                     </div>
                   </div>
-                </div>
+                </section>
 
-                {/* Modules Section */}
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-bold text-dark-400 uppercase tracking-wider">Curriculum Modules</h3>
-                    <button 
-                      type="button" onClick={addModuleField}
-                      className="text-xs font-bold text-primary flex items-center gap-1 hover:underline"
-                    >
-                      <Plus size={14} /> Add Module
+                <section className="space-y-6">
+                  <div className="flex items-center justify-between border-b border-dark-100 pb-2">
+                    <h3 className="text-sm font-bold text-dark-400 uppercase tracking-widest">2. Curriculum Modules</h3>
+                    <button type="button" onClick={addModuleField} className="text-xs font-bold text-primary flex items-center gap-1 bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-all">
+                      <PlusCircle size={14} /> Add New Module
                     </button>
                   </div>
 
-                  <div className="space-y-4">
-                    {modules.map((module, index) => (
-                      <div key={index} className="p-4 bg-dark-50 rounded-2xl border border-dark-200 relative group">
-                        <button 
-                          type="button" onClick={() => removeModuleField(index)}
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-danger text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                        >
-                          <X size={14} />
-                        </button>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-8">
+                    {modules.map((module, mIdx) => (
+                      <div key={mIdx} className="bg-dark-50/50 p-6 rounded-3xl border-2 border-dark-100 relative">
+                        <button type="button" onClick={() => removeModuleField(mIdx)} className="absolute top-4 right-4 text-danger hover:bg-danger/10 p-2 rounded-full"><Trash2 size={18} /></button>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div className="md:col-span-2">
-                            <input 
-                              type="text" value={module.title} onChange={(e) => handleModuleChange(index, 'title', e.target.value)}
-                              className="w-full px-3 py-2 border-b-2 border-dark-200 bg-transparent focus:border-primary outline-none transition-all font-bold"
-                              placeholder="Module Title (e.g. Introduction)"
-                            />
+                            <label className="block text-[10px] font-bold text-dark-400 uppercase mb-1">Module Header</label>
+                            <input type="text" value={module.title} onChange={(e) => handleModuleChange(mIdx, 'title', e.target.value)} className="w-full px-0 py-1 bg-transparent border-b border-dark-200 focus:border-primary outline-none font-bold text-lg" placeholder="Module Title" />
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-dark-400 uppercase">Video URL / Upload</label>
+                          
+                          <div className="md:col-span-2">
+                            <label className="block text-[10px] font-bold text-dark-400 uppercase mb-1">Module Description / Tasks</label>
+                            <textarea value={module.description} onChange={(e) => handleModuleChange(mIdx, 'description', e.target.value)} className="w-full px-3 py-2 bg-white border border-dark-200 rounded-xl text-sm" rows="2" placeholder="Briefly explain what tasks students should perform..." />
+                          </div>
+
+                          <div className="flex flex-col gap-4">
+                            <label className="text-[10px] font-bold text-dark-400 uppercase">Video Content (URL or Upload)</label>
                             <div className="flex gap-2">
-                              <input 
-                                type="text" value={module.videoUrl} onChange={(e) => handleModuleChange(index, 'videoUrl', e.target.value)}
-                                className="flex-1 px-3 py-2 bg-white border border-dark-200 rounded-lg text-sm"
-                                placeholder="S3 URL or Upload"
-                              />
-                              <label className="shrink-0 p-2 bg-dark-900 text-white rounded-lg cursor-pointer hover:bg-dark-800 transition-all">
-                                <Video size={18} />
-                                <input type="file" accept="video/*" className="hidden" onChange={(e) => handleFileUpload(index, 'videoUrl', e.target.files[0])} />
-                              </label>
+                              <input type="text" value={module.videoUrl} onChange={(e) => handleModuleChange(mIdx, 'videoUrl', e.target.value)} className="flex-1 px-3 py-2 bg-white border border-dark-200 rounded-lg text-sm" placeholder="S3 URL" />
+                              <label className="p-2 bg-dark-900 text-white rounded-lg cursor-pointer"><Video size={18} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(mIdx, 'videoUrl', e.target.files[0])} /></label>
                             </div>
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-dark-400 uppercase">PDF URL / Upload</label>
+
+                          <div className="flex flex-col gap-4">
+                            <label className="text-[10px] font-bold text-dark-400 uppercase">Study Notes (PDF or Upload)</label>
                             <div className="flex gap-2">
-                              <input 
-                                type="text" value={module.pdfUrl} onChange={(e) => handleModuleChange(index, 'pdfUrl', e.target.value)}
-                                className="flex-1 px-3 py-2 bg-white border border-dark-200 rounded-lg text-sm"
-                                placeholder="S3 URL or Upload"
-                              />
-                              <label className="shrink-0 p-2 bg-dark-900 text-white rounded-lg cursor-pointer hover:bg-dark-800 transition-all">
-                                <FileText size={18} />
-                                <input type="file" accept="application/pdf" className="hidden" onChange={(e) => handleFileUpload(index, 'pdfUrl', e.target.files[0])} />
-                              </label>
+                              <input type="text" value={module.pdfUrl} onChange={(e) => handleModuleChange(mIdx, 'pdfUrl', e.target.value)} className="flex-1 px-3 py-2 bg-white border border-dark-200 rounded-lg text-sm" placeholder="S3 URL" />
+                              <label className="p-2 bg-primary text-white rounded-lg cursor-pointer"><FileText size={18} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(mIdx, 'pdfUrl', e.target.files[0])} /></label>
+                            </div>
+                          </div>
+
+                          <div className="md:col-span-2 mt-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-xs font-bold text-dark-600 uppercase flex items-center gap-2">
+                                <Layout size={14} /> Module Quiz (MCQs)
+                              </h4>
+                              <button type="button" onClick={() => addQuizQuestion(mIdx)} className="text-[10px] font-bold text-accent border border-accent/20 px-2 py-1 rounded-md hover:bg-accent/5">
+                                + Add Question
+                              </button>
+                            </div>
+                            
+                            <div className="space-y-4">
+                              {module.quiz?.map((q, qIdx) => (
+                                <div key={qIdx} className="bg-white p-4 rounded-xl border border-dark-200 relative">
+                                  <button type="button" onClick={() => removeQuizQuestion(mIdx, qIdx)} className="absolute top-2 right-2 text-danger"><MinusCircle size={16} /></button>
+                                  <input 
+                                    type="text" value={q.question} 
+                                    onChange={(e) => handleQuizChange(mIdx, qIdx, 'question', e.target.value)}
+                                    className="w-full mb-3 font-medium border-b border-dark-100 outline-none text-sm" 
+                                    placeholder="Question Text" 
+                                  />
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {q.options.map((opt, oIdx) => (
+                                      <div key={oIdx} className="flex items-center gap-2">
+                                        <input 
+                                          type="radio" name={`correct-${mIdx}-${qIdx}`} 
+                                          checked={q.correctAnswer === oIdx}
+                                          onChange={() => handleQuizChange(mIdx, qIdx, 'correctAnswer', oIdx)}
+                                        />
+                                        <input 
+                                          type="text" value={opt} 
+                                          onChange={(e) => handleQuizChange(mIdx, qIdx, 'options', e.target.value, oIdx)}
+                                          className="text-xs border-b border-dark-50 outline-none flex-1" 
+                                          placeholder={`Option ${oIdx + 1}`} 
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                </div>
+                </section>
               </form>
 
               <footer className="p-6 border-t border-dark-200 bg-dark-50 flex justify-end gap-4">
-                <button 
-                  type="button" onClick={() => setIsModalOpen(false)}
-                  className="px-6 py-2 text-dark-600 font-bold hover:bg-dark-200 rounded-xl transition-all"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={handleSubmit} disabled={saving || uploading}
-                  className="px-8 py-2 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-70"
-                >
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2 text-dark-600 font-bold hover:bg-dark-200 rounded-xl transition-all">Cancel</button>
+                <button onClick={handleSubmit} disabled={saving || uploading} className="px-8 py-2 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover shadow-lg shadow-primary/20 flex items-center gap-2">
                   {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={18} />}
-                  {editingCourse ? 'Save Changes' : 'Publish Course'}
+                  {editingCourse ? 'Commit Changes' : 'Launch Course'}
                 </button>
               </footer>
             </div>

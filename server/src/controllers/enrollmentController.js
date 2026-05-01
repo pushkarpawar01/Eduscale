@@ -2,6 +2,7 @@ import Enrollment from '../models/Enrollment.js';
 import Content from '../models/Content.js';
 import User from '../models/User.js';
 import { sendEnrollmentEmail, sendCertificateEmail } from '../utils/emailService.js';
+import { generateCertificatePDF, generateReceiptPDF } from '../utils/certificateService.js';
 
 export const enrollInCourse = async (req, res) => {
   try {
@@ -27,7 +28,19 @@ export const enrollInCourse = async (req, res) => {
     });
 
     await enrollment.save();
-    await sendEnrollmentEmail(user.email, user.name, course.title, isPaid, course.price);
+
+    let receiptBuffer = null;
+    if (isPaid) {
+      receiptBuffer = await generateReceiptPDF(
+        user.name,
+        course.title,
+        course.price,
+        enrollment.paymentId,
+        Date.now()
+      );
+    }
+
+    await sendEnrollmentEmail(user.email, user.name, course.title, isPaid, course.price, receiptBuffer);
 
     res.status(201).json({ message: 'Enrolled successfully', enrollment });
   } catch (error) {
@@ -53,7 +66,39 @@ export const getCourseProgress = async (req, res) => {
     const enrollment = await Enrollment.findOne({ user: userId, course: courseId });
     if (!enrollment) return res.status(404).json({ message: 'Enrollment not found' });
 
-    res.json({ progress: enrollment.progress, completedModules: enrollment.completedModules });
+    res.json({ 
+      progress: enrollment.progress, 
+      completedModules: enrollment.completedModules,
+      quizResults: enrollment.quizResults || []
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const submitQuizResult = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+    const { moduleId, score, totalQuestions } = req.body;
+    const userId = req.user.userId;
+
+    const enrollment = await Enrollment.findOne({ user: userId, course: courseId });
+    if (!enrollment) return res.status(404).json({ message: 'Enrollment not found' });
+
+    // Remove existing result for this module if any
+    enrollment.quizResults = enrollment.quizResults.filter(r => r.moduleId !== moduleId);
+
+    const passed = (score / totalQuestions) >= 0.6; // 60% pass mark
+
+    enrollment.quizResults.push({
+      moduleId,
+      score,
+      totalQuestions,
+      passed
+    });
+
+    await enrollment.save();
+    res.json(enrollment);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -100,12 +145,32 @@ export const sendCertificate = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    const certificateUrl = `https://eduscale.com/verify/ESC-${enrollmentId.substring(18).toUpperCase()}`;
+    
+    // Generate PDF Buffer
+    const certificateId = `ESC-${enrollmentId.substring(18).toUpperCase()}`;
+    const pdfBuffer = await generateCertificatePDF(
+      user.name, 
+      enrollment.course.title, 
+      enrollment.completionDate || Date.now(),
+      certificateId
+    );
 
-    await sendCertificateEmail(user.email, user.name, enrollment.course.title, certificateUrl);
+    await sendCertificateEmail(user.email, user.name, enrollment.course.title, pdfBuffer);
 
-    res.json({ message: 'Certificate emailed successfully' });
+    res.json({ message: 'Certificate emailed successfully as PDF attachment' });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Certificate Error:', error);
+    res.status(500).json({ message: 'Server error while generating/sending certificate' });
+  }
+};
+
+export const getAllEnrollments = async (req, res) => {
+  try {
+    const enrollments = await Enrollment.find()
+      .populate('user', 'name email mobile college degree')
+      .populate('course', 'title');
+    res.json(enrollments);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

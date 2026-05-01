@@ -2,10 +2,16 @@ import mongoose from 'mongoose';
 
 const moduleSchema = new mongoose.Schema({
   title: { type: String, required: true },
+  description: { type: String },
   videoUrl: { type: String }, // S3 Link
   pdfUrl: { type: String },   // S3 Link
   duration: { type: String }, // e.g., "10:30"
-  isPreview: { type: Boolean, default: false }
+  isPreview: { type: Boolean, default: false },
+  quiz: [{
+    question: String,
+    options: [String],
+    correctAnswer: Number // index of options
+  }]
 });
 
 const contentSchema = new mongoose.Schema({

@@ -1,5 +1,5 @@
 import express from 'express';
-import { createCourse, addModule, createQuiz, getCourseFullDetails, updateCourse, deleteCourse } from '../controllers/courseController.js';
+import { createCourse, addModule, createQuiz, getCourseFullDetails, updateCourse, deleteCourse, getAllCourses } from '../controllers/courseController.js';
 import auth from '../middleware/auth.js';
 import adminAuth from '../middleware/adminAuth.js';
 import { upload } from '../config/s3.js';
@@ -19,6 +19,7 @@ router.post('/upload', adminAuth, upload.single('file'), (req, res) => {
   res.json({ url: req.file.location });
 });
 
+router.get('/', adminAuth, getAllCourses);
 router.get('/:courseId', auth, getCourseFullDetails);
 
 export default router;

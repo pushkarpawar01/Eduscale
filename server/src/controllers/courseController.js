@@ -87,6 +87,15 @@ export const updateCourse = async (req, res) => {
   }
 };
 
+export const getAllCourses = async (req, res) => {
+  try {
+    const courses = await Content.find();
+    res.json(courses);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 export const deleteCourse = async (req, res) => {
   try {
     const { courseId } = req.params;
