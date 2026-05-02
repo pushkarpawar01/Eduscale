@@ -14,6 +14,7 @@ import courseRoutes from './src/routes/course.js';
 import enrollmentRoutes from './src/routes/enrollment.js';
 import paymentRoutes from './src/routes/payment.js';
 import analyticsRoutes from './src/routes/analytics.js';
+import './src/jobs/logWorker.js'; // Start async log queue worker
 
 // Load env vars
 dotenv.config();
@@ -25,7 +26,7 @@ const app = express();
 app.use(express.static(path.resolve(__dirname, "../client/dist")));
 // Middleware
 app.use(cors({
-    origin: 'http://localhost:5173', // Your Vite frontend URL
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Your Vite frontend URL
     credentials: true
 }));
 app.use(express.json());

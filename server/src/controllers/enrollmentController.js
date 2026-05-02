@@ -3,6 +3,11 @@ import Content from '../models/Content.js';
 import User from '../models/User.js';
 import { sendEnrollmentEmail, sendCertificateEmail } from '../utils/emailService.js';
 import { generateCertificatePDF, generateReceiptPDF } from '../utils/certificateService.js';
+import { cacheGet, cacheSet, cacheDel, cacheDelPattern } from '../config/redis.js';
+
+// Cache key helpers
+const enrolledCoursesKey = (userId) => `enrollment:my-courses:${userId}`;
+const progressKey = (userId, courseId) => `enrollment:progress:${userId}:${courseId}`;
 
 export const enrollInCourse = async (req, res) => {
   try {
@@ -29,14 +34,13 @@ export const enrollInCourse = async (req, res) => {
 
     await enrollment.save();
 
+    // Invalidate the user's enrolled-courses cache
+    await cacheDel(enrolledCoursesKey(userId));
+
     let receiptBuffer = null;
     if (isPaid) {
       receiptBuffer = await generateReceiptPDF(
-        user.name,
-        course.title,
-        course.price,
-        enrollment.paymentId,
-        Date.now()
+        user.name, course.title, course.price, enrollment.paymentId, Date.now()
       );
     }
 
@@ -51,7 +55,22 @@ export const enrollInCourse = async (req, res) => {
 export const getMyEnrolledCourses = async (req, res) => {
   try {
     const userId = req.user.userId;
+    const cKey = enrolledCoursesKey(userId);
+
+    // 1. Try cache
+    const cached = await cacheGet(cKey);
+    if (cached) {
+      console.log(`[Cache] HIT: ${cKey}`);
+      return res.json(cached);
+    }
+
+    // 2. Cache MISS → DB
+    console.log(`[Cache] MISS: ${cKey}`);
     const enrollments = await Enrollment.find({ user: userId }).populate('course');
+
+    // 3. Cache for 2 minutes (short TTL because enrollment status changes often)
+    await cacheSet(cKey, enrollments, 120);
+
     res.json(enrollments);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -62,15 +81,30 @@ export const getCourseProgress = async (req, res) => {
   try {
     const { courseId } = req.params;
     const userId = req.user.userId;
+    const cKey = progressKey(userId, courseId);
 
+    // 1. Try cache
+    const cached = await cacheGet(cKey);
+    if (cached) {
+      console.log(`[Cache] HIT: ${cKey}`);
+      return res.json(cached);
+    }
+
+    // 2. Cache MISS → DB
+    console.log(`[Cache] MISS: ${cKey}`);
     const enrollment = await Enrollment.findOne({ user: userId, course: courseId });
     if (!enrollment) return res.status(404).json({ message: 'Enrollment not found' });
 
-    res.json({ 
-      progress: enrollment.progress, 
+    const payload = {
+      progress: enrollment.progress,
       completedModules: enrollment.completedModules,
       quizResults: enrollment.quizResults || []
-    });
+    };
+
+    // 3. Cache for 1 minute (progress changes on each lesson completion)
+    await cacheSet(cKey, payload, 60);
+
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
@@ -85,19 +119,15 @@ export const submitQuizResult = async (req, res) => {
     const enrollment = await Enrollment.findOne({ user: userId, course: courseId });
     if (!enrollment) return res.status(404).json({ message: 'Enrollment not found' });
 
-    // Remove existing result for this module if any
     enrollment.quizResults = enrollment.quizResults.filter(r => r.moduleId !== moduleId);
+    const passed = (score / totalQuestions) >= 0.6;
 
-    const passed = (score / totalQuestions) >= 0.6; // 60% pass mark
-
-    enrollment.quizResults.push({
-      moduleId,
-      score,
-      totalQuestions,
-      passed
-    });
-
+    enrollment.quizResults.push({ moduleId, score, totalQuestions, passed });
     await enrollment.save();
+
+    // Invalidate progress cache for this user+course
+    await cacheDel(progressKey(userId, courseId));
+
     res.json(enrollment);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -126,6 +156,9 @@ export const updateProgress = async (req, res) => {
       }
 
       await enrollment.save();
+
+      // Invalidate progress + enrolled-courses cache
+      await cacheDel(progressKey(userId, courseId), enrolledCoursesKey(userId));
     }
 
     res.json(enrollment);
@@ -145,14 +178,9 @@ export const sendCertificate = async (req, res) => {
     }
 
     const user = await User.findById(userId);
-    
-    // Generate PDF Buffer
     const certificateId = `ESC-${enrollmentId.substring(18).toUpperCase()}`;
     const pdfBuffer = await generateCertificatePDF(
-      user.name, 
-      enrollment.course.title, 
-      enrollment.completionDate || Date.now(),
-      certificateId
+      user.name, enrollment.course.title, enrollment.completionDate || Date.now(), certificateId
     );
 
     await sendCertificateEmail(user.email, user.name, enrollment.course.title, pdfBuffer);

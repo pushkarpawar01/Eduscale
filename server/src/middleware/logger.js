@@ -1,32 +1,25 @@
-import Log from '../models/Log.js';
+import logQueue from '../jobs/logQueue.js';
 
-const logger = async (req, res, next) => {
+const logger = (req, res, next) => {
   const start = Date.now();
   const endpoint = req.originalUrl;
-  
-  // Hook into response finish to capture status and time
-  res.on('finish', async () => {
-    try {
-      const responseTime = Date.now() - start;
-      const logEntry = new Log({
-        method: req.method,
-        url: endpoint,
-        status: res.statusCode,
-        responseTime,
-        ip: req.ip,
-        userAgent: req.get('user-agent'),
-        user: req.user ? req.user.userId : null
-      });
-      await logEntry.save();
-    } catch (err) {
-      console.error('Logging error:', err);
-    }
+
+  res.on('finish', () => {
+    // Push to async queue — fires after response is sent, no latency added
+    logQueue.add({
+      method: req.method,
+      url: endpoint,
+      status: res.statusCode,
+      responseTime: Date.now() - start,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      userId: req.user ? req.user.userId : null,
+    });
+
+    // Terminal log (sync — instant)
+    console.log(`[${new Date().toISOString()}] ${req.method} ${endpoint} - ${req.user?.userId || 'anonymous'}`);
   });
 
-  const timestamp = new Date().toISOString();
-  const userId = req.user ? req.user.userId : 'anonymous';
-  console.log(`[${timestamp}] ${req.method} ${endpoint} - ${userId}`);
-  
   next();
 };
 

@@ -1,9 +1,15 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import { blacklistToken, cacheGet, cacheSet, cacheDel } from '../config/redis.js';
+
+const userProfileKey = (userId) => `user:profile:${userId}`;
 
 const generateTokens = (user) => {
-  const payload = { userId: user._id, role: user.role, name: user.name };
+  // jti (JWT ID) = unique ID per token, used for blacklisting on logout
+  const jti = uuidv4();
+  const payload = { userId: user._id, role: user.role, name: user.name, jti };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET || 'fallback_secret_key', { expiresIn: '15m' });
   const refreshToken = jwt.sign(payload, process.env.REFRESH_TOKEN_SECRET || 'fallback_refresh_secret', { expiresIn: '7d' });
   return { accessToken, refreshToken };
@@ -86,13 +92,29 @@ export const refresh = (req, res) => {
   }
 };
 
-export const logout = (req, res) => {
-  res.clearCookie('refreshToken', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-  });
-  res.json({ message: 'Logged out successfully' });
+export const logout = async (req, res) => {
+  try {
+    // Blacklist the current access token in Redis
+    const token = req.header('Authorization')?.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.decode(token);
+        if (decoded?.jti && decoded?.exp) {
+          const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+          if (ttl > 0) await blacklistToken(decoded.jti, ttl);
+        }
+      } catch (_) { /* ignore decode errors */ }
+    }
+
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+    res.json({ message: 'Logged out successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error during logout' });
+  }
 };
 
 export const updateProfile = async (req, res) => {
@@ -105,6 +127,10 @@ export const updateProfile = async (req, res) => {
     delete updates.email;
 
     const user = await User.findByIdAndUpdate(userId, updates, { new: true }).select('-password');
+
+    // Invalidate cached profile so next getMe fetches fresh data
+    await cacheDel(userProfileKey(userId));
+
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -113,10 +139,29 @@ export const updateProfile = async (req, res) => {
 
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
+    const userId = req.user.userId;
+    const cKey = userProfileKey(userId);
+
+    // Try cache first
+    const cached = await cacheGet(cKey);
+    if (cached) {
+      console.log(`[Cache] HIT: ${cKey}`);
+      return res.json(cached);
+    }
+
+    // Cache MISS → DB
+    console.log(`[Cache] MISS: ${cKey}`);
+    const user = await User.findById(userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
+
+    // Cache profile for 5 minutes
+    await cacheSet(cKey, user, 300);
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
+};
+
+export const invalidateUserCache = async (userId) => {
+  await cacheDel(userProfileKey(userId));
 };
