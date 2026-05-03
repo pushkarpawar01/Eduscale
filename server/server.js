@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 import connectDB from './src/config/db.js';
@@ -14,7 +15,7 @@ import courseRoutes from './src/routes/course.js';
 import enrollmentRoutes from './src/routes/enrollment.js';
 import paymentRoutes from './src/routes/payment.js';
 import analyticsRoutes from './src/routes/analytics.js';
-import './src/jobs/logWorker.js'; // Start async log queue worker
+import './src/jobs/logWorker.js';
 
 // Load env vars
 dotenv.config();
@@ -23,10 +24,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-app.use(express.static(path.resolve(__dirname, "../client/dist")));
+
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173', // Your Vite frontend URL
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
@@ -35,7 +36,18 @@ app.use(cookieParser());
 // Apply logger to all API routes
 app.use('/api', logger);
 
-// Routes
+// Health check endpoint — used by Docker healthcheck and load balancer
+app.get('/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        instance: process.env.HOSTNAME || 'local',
+        uptime: Math.floor(process.uptime()),
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+        timestamp: new Date().toISOString()
+    });
+});
+
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/content', contentRoutes);
@@ -44,20 +56,25 @@ app.use('/api/enrollment', enrollmentRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// --- PRODUCTION CONFIGURATION ---
-if (process.env.NODE_ENV === 'production') {
-    // Serve static files from the React app build folder
-    app.use(express.static(path.join(__dirname, '../client/dist')));
+// Static file serving:
+// - In Docker: Nginx container handles this — backend is API-only
+// - In local dev/Render: backend serves the built client
+const distPath = path.resolve(__dirname, '../client/dist');
+const distExists = fs.existsSync(distPath);
 
-    // Catch-all route to serve index.html (SPA Fallback)
-    // Using app.use with no path to avoid path-to-regexp errors in Express 5
+if (distExists) {
+    app.use(express.static(distPath));
+    // SPA fallback — serve index.html for all non-API routes
     app.use((req, res) => {
-        res.sendFile(path.resolve(__dirname, '../client/dist', 'index.html'));
+        res.sendFile(path.resolve(distPath, 'index.html'));
     });
+    console.log('[Server] Serving frontend static files from:', distPath);
 } else {
+    // Docker mode — backend is API-only, Nginx handles frontend
     app.get('/', (req, res) => {
-        res.send('API is running in development mode...');
+        res.json({ message: 'Eduscale API is running.', mode: 'docker-api-only' });
     });
+    console.log('[Server] API-only mode (no client/dist found — Nginx serves frontend)');
 }
 
 // Database connection

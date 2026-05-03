@@ -1,11 +1,20 @@
 {
   "name": "eduscale-monorepo",
   "version": "1.0.0",
-  "description": "Eduscale LMS monorepo for Render deployment",
-  "main": "server/server.js",
+  "description": "Eduscale LMS — Production-ready monorepo",
+  "type": "module",
   "scripts": {
-    "build": "cd client && npm install && npm run build && cd ../server && npm install",
-    "start": "cd server && node server.js"
+    "build":          "cd client && npm install && npm run build && cd ../server && npm install",
+    "start":          "cd server && node server.js",
+    "docker:up":      "docker-compose up --build -d",
+    "docker:down":    "docker-compose down",
+    "docker:logs":    "docker-compose logs -f backend",
+    "docker:status":  "docker ps --format \"table {{.Names}}\\t{{.Status}}\\t{{.Ports}}\"",
+    "scale:up":       "docker-compose up -d --scale backend=5 --no-recreate",
+    "scale:down":     "docker-compose up -d --scale backend=2 --no-recreate",
+    "scale:exam":     "docker-compose up -d --scale backend=10 --no-recreate",
+    "scale:auto":     "node scripts/autoscale.js --watch",
+    "scale:set":      "node scripts/autoscale.js --scale"
   },
   "keywords": [],
   "author": "",
