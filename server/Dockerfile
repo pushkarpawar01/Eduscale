@@ -1,7 +1,3 @@
-# ================================
-# Backend (Node.js) Dockerfile
-# ================================
-
 # Use Node 20 LTS Alpine — small and fast
 FROM node:20-alpine
 

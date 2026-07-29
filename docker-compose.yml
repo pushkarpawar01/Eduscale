@@ -1,16 +1,8 @@
-# =================================================================
-# Eduscale LMS — Docker Compose (Phase 6: Load Balancing)
-# =================================================================
 # Normal run:     docker-compose up --build
 # Scale up:       docker-compose up --scale backend=5
 # Auto-scale:     node scripts/autoscale.js
-# =================================================================
 
 services:
-
-  # ── Load Balancer (Nginx) ─────────────────────────────────────
-  # Sits between frontend and backend.
-  # Distributes requests across all backend instances.
   loadbalancer:
     image: nginx:alpine
     container_name: eduscale-loadbalancer
@@ -20,18 +12,15 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:8080"          # Exposed for direct API testing
+      - "8080:8080" # Exposed for direct API testing
     networks:
       - eduscale-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/lb-health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8080/lb-health" ]
       interval: 10s
       timeout: 5s
       retries: 3
 
-  # ── Backend (Node.js/Express) ─────────────────────────────────
-  # NO container_name — required for scaling (each gets auto name)
-  # NO fixed host port — Docker assigns dynamic ports when scaled
   backend:
     build:
       context: ./server
@@ -58,13 +47,11 @@ services:
       - eduscale-net
     # No ports exposed to host — only reachable via load balancer
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5000/health"]
+      test: [ "CMD", "wget", "-qO-", "http://localhost:5000/health" ]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  # ── Frontend (React + Nginx) ──────────────────────────────────
   frontend:
     build:
       context: ./client

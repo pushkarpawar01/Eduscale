@@ -1,10 +1,3 @@
-# ================================
-# Frontend (React/Vite) Dockerfile
-# ================================
-# Two-stage build:
-# Stage 1 — Build the React app with Node
-# Stage 2 — Serve the static output with Nginx (no Node needed in production)
-
 # ---- Stage 1: Build ----
 FROM node:20-alpine AS builder
 
