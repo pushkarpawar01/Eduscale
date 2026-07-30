@@ -131,21 +131,46 @@ const AdminDashboard = () => {
 
   const handleFileUpload = async (index, field, file) => {
     if (!file) return;
+
+    // Client-side size guard: warn if > 500MB before even sending
+    if (file.size > 500 * 1024 * 1024) {
+      setStatus({ type: 'error', msg: 'File too large. Maximum size is 500MB.' });
+      return;
+    }
+
     setUploading(true);
+    setStatus({ type: 'info', msg: `Uploading ${file.name} (0%)…` });
+
     const formData = new FormData();
     formData.append('file', file);
 
     try {
       const res = await api.post('/api/course/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 10 * 60 * 1000, // 10 minutes — enough for large videos
+        onUploadProgress: (progressEvent) => {
+          const pct = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setStatus({ type: 'info', msg: `Uploading ${file.name} (${pct}%)…` });
+        },
       });
       handleModuleChange(index, field, res.data.url);
+      setStatus({ type: 'success', msg: `${file.name} uploaded successfully!` });
     } catch (error) {
-      alert('File upload failed.');
+      const serverMsg = error.response?.data?.message;
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        setStatus({ type: 'error', msg: 'Upload timed out. Try a smaller file or check your internet connection.' });
+      } else if (error.response?.status === 413) {
+        setStatus({ type: 'error', msg: serverMsg || 'File too large. Maximum size is 500MB.' });
+      } else if (error.response?.status === 415) {
+        setStatus({ type: 'error', msg: serverMsg || 'File type not allowed. Use MP4, WebM, MOV, or PDF.' });
+      } else {
+        setStatus({ type: 'error', msg: serverMsg || 'Upload failed. Please try again.' });
+      }
     } finally {
       setUploading(false);
     }
   };
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -206,15 +231,18 @@ const AdminDashboard = () => {
 
         {status.msg && (
           <div className={`mb-6 p-4 rounded-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300 ${
-            status.type === 'error' ? 'bg-danger/10 text-danger border border-danger/20' : 'bg-success/10 text-success border border-success/20'
+            status.type === 'error' ? 'bg-danger/10 text-danger border border-danger/20' 
+            : status.type === 'info' ? 'bg-blue-50 text-blue-700 border border-blue-200'
+            : 'bg-success/10 text-success border border-success/20'
           }`}>
             <div className="flex items-center gap-3">
-              {status.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle size={20} />}
+              {status.type === 'error' ? <AlertCircle size={20} /> : status.type === 'info' ? <div className="w-5 h-5 border-2 border-blue-400 border-t-blue-700 rounded-full animate-spin" /> : <CheckCircle size={20} />}
               <span className="font-bold">{status.msg}</span>
             </div>
-            <button onClick={() => setStatus({ type: '', msg: '' })}><X size={18} /></button>
+            {status.type !== 'info' && <button onClick={() => setStatus({ type: '', msg: '' })}><X size={18} /></button>}
           </div>
         )}
+
 
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
@@ -339,7 +367,19 @@ const AdminDashboard = () => {
                       <label className="block text-sm font-bold text-dark-700 mb-2">General Description</label>
                       <textarea id="description" required rows="3" value={courseData.description} onChange={handleCourseChange} className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" />
                     </div>
-                    <div className="flex items-center gap-4 p-4 bg-dark-50 rounded-xl border border-dark-200 md:col-span-2">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-bold text-dark-700 mb-2">Course Thumbnail URL <span className="text-danger">*</span></label>
+                      <input id="imageUrl" type="url" required value={courseData.imageUrl} onChange={handleCourseChange} placeholder="https://example.com/thumbnail.jpg" className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" />
+                      {courseData.imageUrl && (
+                        <img src={courseData.imageUrl} alt="Preview" className="mt-3 h-32 w-full object-cover rounded-xl border border-dark-200" onError={(e) => e.target.style.display='none'} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-dark-700 mb-2">Category</label>
+                      <input id="category" type="text" value={courseData.category} onChange={handleCourseChange} placeholder="e.g. Web Development, Design..." className="w-full px-4 py-3 bg-dark-50 border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none" />
+                    </div>
+                    <div className="flex items-center gap-4 p-4 bg-dark-50 rounded-xl border border-dark-200">
+
                       <input id="isFree" type="checkbox" checked={courseData.isFree} onChange={handleCourseChange} className="w-5 h-5 rounded border-dark-300 text-primary" />
                       <label htmlFor="isFree" className="text-sm font-bold text-dark-900">This is a free course</label>
                       {!courseData.isFree && (

@@ -19,6 +19,10 @@ export default {
           DEFAULT: '#ef4444',
           hover: '#dc2828',
         },
+        success: {
+          DEFAULT: '#22c55e',
+          hover: '#16a34a',
+        },
         dark: {
           950: '#020617',
           900: '#0f172a',

@@ -11,7 +11,7 @@ The primary objective of the architecture is to handle "Exam Season" traffic spi
 *   **Frontend**: React.js, Vite, TailwindCSS, Axios
 *   **Backend**: Node.js, Express.js
 *   **Database**: MongoDB Atlas (Cloud)
-*   **Cache & Session Store**: Upstash Redis (Cloud)
+*   **Cache & Session Store**: Upstash Redis (Cloud) serverless redis service
 *   **Containerization**: Docker, Docker Compose
 *   **Web Server & Reverse Proxy**: Nginx (Alpine)
 *   **Process Manager**: PM2 (for Auto-Scaler daemon)
@@ -196,3 +196,18 @@ docker-compose down
 
 ---
 *Document generated for Eduscale Architecture V1.0*
+
+
+
+# For load balancer testing on localhost
+for i in {1..5}; do curl -s http://localhost:8080/health | jq '.instance'; done
+
+# To see the auto-scaler logs
+pm2 logs eduscale-autoscaler
+
+
+# Install the tool
+sudo npm install -g autocannon
+
+# Send 500 concurrent connections for 60 seconds
+autocannon -c 500 -d 60 http://localhost:8080/health

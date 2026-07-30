@@ -9,8 +9,8 @@ const courseKey = (id) => `course:${id}`;
 
 export const createCourse = async (req, res) => {
   try {
-    const { title, description, imageUrl, price, isFree, category } = req.body;
-    const newCourse = new Content({ title, description, imageUrl, price, isFree, category });
+    const { title, description, imageUrl, price, isFree, category, modules } = req.body;
+    const newCourse = new Content({ title, description, imageUrl, price, isFree, category, modules: modules || [] });
     await newCourse.save();
 
     // Invalidate the all-courses cache so next fetch is fresh
@@ -18,9 +18,11 @@ export const createCourse = async (req, res) => {
 
     res.status(201).json(newCourse);
   } catch (error) {
+    console.error('[createCourse] Error:', error.message);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 export const addModule = async (req, res) => {
   try {

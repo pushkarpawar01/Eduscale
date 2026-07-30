@@ -1,22 +1,8 @@
-#!/usr/bin/env node
-/**
- * Eduscale Auto-Scaler — Phase 6
- * ================================
- * Monitors CPU usage and container count, then scales the
- * backend service up or down using docker-compose commands.
- *
- * Usage:
- *   node scripts/autoscale.js              # Run once
- *   node scripts/autoscale.js --watch      # Run every 30s continuously
- *   node scripts/autoscale.js --scale=5    # Force scale to 5 instances
- */
-
 import { execSync, exec } from 'child_process';
 import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
-// ── Config ──────────────────────────────────────────────────────
 const CONFIG = {
   minInstances: 2,          // Always run at least 2 (high availability)
   maxInstances: 10,         // Cap at 10 (adjust based on your server RAM)
@@ -28,8 +14,6 @@ const CONFIG = {
   serviceName: 'backend',   // Docker Compose service to scale
   composeFile: 'docker-compose.yml',
 };
-
-// ── Helpers ─────────────────────────────────────────────────────
 
 const log = (msg) => console.log(`[AutoScaler] ${new Date().toISOString().slice(11, 19)} ${msg}`);
 
@@ -78,10 +62,10 @@ async function scaleTo(count) {
     await execAsync(
       `docker-compose -f ${CONFIG.composeFile} up -d --scale ${CONFIG.serviceName}=${clamped} --no-recreate`
     );
-    log(`✅ Scaled to ${clamped} instances successfully.`);
+    log(`Scaled to ${clamped} instances successfully.`);
     return clamped;
   } catch (err) {
-    log(`❌ Scale failed: ${err.message}`);
+    log(`Scale failed: ${err.message}`);
     return null;
   }
 }
@@ -110,7 +94,7 @@ function printDashboard(instances, avgCpu, currentReplicas, action) {
   console.log('─'.repeat(60) + '\n');
 }
 
-// ── Main Logic ───────────────────────────────────────────────────
+//Main Logic 
 
 async function runScalingCheck() {
   const instances = await getBackendStats();
@@ -146,7 +130,7 @@ async function runScalingCheck() {
   printDashboard(instances, avgCpu, currentReplicas, action);
 }
 
-// ── Entry Point ──────────────────────────────────────────────────
+//Entry Point 
 
 const args = process.argv.slice(2);
 

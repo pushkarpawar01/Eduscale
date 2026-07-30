@@ -26,7 +26,18 @@ export const upload = multer({
       const folder = file.mimetype.startsWith('video/') ? 'videos/' : 'docs/';
       cb(null, folder + Date.now().toString() + '-' + file.originalname);
     }
-  })
+  }),
+  limits: {
+    fileSize: 500 * 1024 * 1024, // 500 MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const allowed = ['video/mp4', 'video/webm', 'video/quicktime', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not allowed: ${file.mimetype}`), false);
+    }
+  }
 });
 
 export default s3;
