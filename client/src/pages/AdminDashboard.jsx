@@ -13,6 +13,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Form State
   const [courseData, setCourseData] = useState({
@@ -193,6 +194,17 @@ const AdminDashboard = () => {
     }
   };
 
+  const filteredCourses = courses.filter(course => 
+    course.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (course.category && course.category.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const filteredEnrollments = enrollments.filter(enr => 
+    enr.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    enr.user?.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    enr.course?.title?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-dark-50">
       <Sidebar />
@@ -219,14 +231,27 @@ const AdminDashboard = () => {
             </div>
           </div>
           
-          {activeTab === 'courses' && (
-            <button 
-              onClick={handleOpenCreate}
-              className="w-full sm:w-auto px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-            >
-              <Plus size={20} /> Create New Course
-            </button>
-          )}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+            {activeTab === 'courses' ? (
+              <button 
+                onClick={handleOpenCreate}
+                className="w-full sm:w-auto px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-hover transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 shrink-0"
+              >
+                <Plus size={20} /> Create New Course
+              </button>
+            ) : <div />}
+            
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-400" size={20} />
+              <input 
+                type="text" 
+                placeholder={activeTab === 'courses' ? "Search courses..." : "Search students or courses..."} 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-white border border-dark-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none shadow-sm"
+              />
+            </div>
+          </div>
         </header>
 
         {status.msg && (
@@ -263,7 +288,10 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-100">
-                      {courses.map((course) => (
+                      {filteredCourses.length === 0 ? (
+                        <tr><td colSpan="4" className="px-6 py-12 text-center text-dark-500 font-bold">No courses found matching "{searchQuery}"</td></tr>
+                      ) : (
+                        filteredCourses.map((course) => (
                         <tr key={course._id} className="hover:bg-dark-50/50 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
@@ -293,7 +321,7 @@ const AdminDashboard = () => {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>
@@ -311,7 +339,10 @@ const AdminDashboard = () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-100">
-                      {enrollments.map((enr) => (
+                      {filteredEnrollments.length === 0 ? (
+                        <tr><td colSpan="4" className="px-6 py-12 text-center text-dark-500 font-bold">No enrollments found matching "{searchQuery}"</td></tr>
+                      ) : (
+                        filteredEnrollments.map((enr) => (
                         <tr key={enr._id}>
                           <td className="px-6 py-4">
                             <div className="flex flex-col">
@@ -336,7 +367,7 @@ const AdminDashboard = () => {
                             </span>
                           </td>
                         </tr>
-                      ))}
+                      )))}
                     </tbody>
                   </table>
                 </div>

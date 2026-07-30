@@ -2,7 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import api from '../utils/axiosInstance';
 import Sidebar from '../components/Sidebar';
-import { User, Mail, Phone, Book, GraduationCap, Save, CheckCircle } from 'lucide-react';
+import { User, Mail, Phone, Book, GraduationCap, Save, CheckCircle, HelpCircle } from 'lucide-react';
 
 const Profile = () => {
   const { user } = useContext(AuthContext);
@@ -64,8 +64,6 @@ const Profile = () => {
     }
   };
 
-  if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>;
-
   return (
     <div className="flex flex-col lg:flex-row min-h-screen bg-dark-50">
       <Sidebar />
@@ -77,8 +75,13 @@ const Profile = () => {
           <p className="text-dark-500 mt-1">Keep your information up to date</p>
         </header>
 
-        <div className="max-w-4xl bg-white rounded-2xl border border-dark-200 shadow-sm overflow-hidden">
-          <div className="bg-primary/5 p-6 border-b border-dark-200 flex items-center gap-6">
+        {loading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <div className="max-w-4xl bg-white rounded-2xl border border-dark-200 shadow-sm overflow-hidden">
+            <div className="bg-primary/5 p-6 border-b border-dark-200 flex items-center gap-6">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-primary border-4 border-white shadow-md">
               <User size={40} />
             </div>
@@ -177,6 +180,7 @@ const Profile = () => {
             </div>
           </form>
         </div>
+        )}
       </main>
     </div>
   );
